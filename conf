@@ -1,1 +1,80 @@
 #!/bin/bash
+#
+# changelog
+#  2021-05-22  :: Created
+#
+#───────────────────────────────( requirements )────────────────────────────────
+# Database file stored at ${XDG_CONFIG_HOME:-${HOME}/.config}/hre-utils/conf/
+# Contains mapping of a friendly name (or names?) to a file path. Maybe it would
+# be helpful to specify the resulting file path as the first column, then all
+# associated names for it as the subsequent columns. Hmm. Or a tagging system
+# for searching as well.
+#     PATH  name1,name2,name3  tag1:tag2:tag2
+# Can search by name or tag with:
+#     [[ :"$2": == *:$tag:* ]]
+# Alternatively with `awk`
+#     $ awk "\$2 ~ /(^|,)($word)(\$|,)/ {print \$1}"
+# I think awk is a better choice here. While we can do this loop with only bash
+# builtins, the single call to `awk` won't impact performance drastically.
+#
+# Validation. Example, ensure the user has not passed 'name1,name2,'. We may
+# be able to correct these in-place, and warn the user. Draft out effectively a
+# specsheet detailing the allowed components of each part. Huh, this is starting
+# to sound like good use of practicing some mad basic EBNF. Still haven't played
+# arround with it.
+#
+# In-place format options
+#  1. Sort
+#  2. Columnize
+#
+#═══════════════════════════════════╡ BEGIN ╞═══════════════════════════════════
+
+function usage {
+cat <<EOF
+USAGE: ./$(basename "${BASH_SOURCE[0]}") [OPTION] (COMMAND | NAME)
+
+Options:
+   -d | --debug LOW[,HIGH] Sets debug level to filter unncessary output messages
+   -a | --add PATH         Creates new database entry for PATH, idenfied as NAME
+   -t | --tag TAG[:TAG]    Add tag(s) to database entry for sorting or filtering
+
+Commands:
+   --column                In-place modifies database file to even width columns
+   --sort NUM              In-place sorts database file by the specified col NUM
+   --edit                  Opens \`conf\`s own confuration file for manual editing
+EOF
+
+exit $1
+}
+
+#─────────────────────────────────( argparse )──────────────────────────────────
+while [[ $# -gt 0 ]] ; do
+   case $1 in
+      -h|--help)
+            usage 0 ;;
+
+      -d|--debug)
+            shift ; __debug_level__="$1" ; shift ;;
+
+      -a|--add)
+            shift ; __names__="$1" ; shift ;;
+
+      -t|--tag)
+            shift ; __tags__="$1" ; shift ;;
+
+      -c|--column)
+            shift ; make_columns ;;
+
+      -s|--sort)
+            shift ; make_sorted ;;
+
+      *) __positional__+=( "$1" ) ; shift ;;
+   esac
+done
+
+declare -a ERR_NUM_POSITIONAL
+if [[ ${#__positional__[@]} -ne 1 ]] ; then
+   ERR_NUM_POSITIONAL=( "${__positional__[@]}" )
+else
+   name="${__positional__[0]}"
+fi
