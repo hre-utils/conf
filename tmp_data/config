@@ -1,0 +1,30 @@
+# Haven't yet decided if we want to source this in `conf`, or perhaps
+# confusingly enough use `mk-conf` to parse a .cfg file.
+
+# Sets editor with which to edit config files. Defaults in descending order:
+#  4. emacs    (if installed)
+#  3. vim      (if installed)
+#  2. $EDITOR  (environment variable)
+#  1. $editor  (set in this file)
+editor=
+
+# Should `conf` automatically sort newly inserted entries? If a non-falsy
+# argument (false, no, '') is passed, it is assumed to be a valid paramater to
+# `sort -k`. If not valid, sets to '2' (name).
+# Default is 'false'
+auto_sort=
+
+# Should `conf` automatically fit newly inserted lines to columnar output?
+# Default is 'false'
+auto_column=false
+
+# Sets output & debug level. Specify in the format of LOW[,HIGH]. This setting
+# is overridden by an explicitly set --debug flag. Levels are as follows:
+#  -2  TRASH  You should pretty much never need to see this
+#  -1  NOISE  Only for *very* verbose debugging
+#   0  DEBUG  Regular debug messages, verbose output
+#   1  INFO   Informational, take it or leave it
+#   2  WARN   Something's gone a little awry, but hasn't exploded
+#   3  CRIT   Something has exploded
+# Default is '2,3'
+debug_level=2,3

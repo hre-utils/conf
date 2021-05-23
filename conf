@@ -27,54 +27,181 @@
 #  1. Sort
 #  2. Columnize
 #
-#═══════════════════════════════════╡ BEGIN ╞═══════════════════════════════════
+#══════════════════════════════════╡ GLOBAL ╞═══════════════════════════════════
+PROGDIR=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd )
 
+CONFDIR="${XDG_CONFIG_HOME:-$HOME/.config}/hre-utils/conf"
+mkdir -p "$CONFDIR"
+
+DATABASE="${CONFDIR}/database"
+CONFFILE="${CONFDIR}/config"
+
+#──────────────────────────────────( source )───────────────────────────────────
+# TODO: use `import.sh`
+source $(which mk-colors.sh)
+
+#═════════════════════════════════╡ FUNCTIONS ╞═════════════════════════════════
+#───────────────────────────────────( utils )───────────────────────────────────
 function usage {
 cat <<EOF
 USAGE: ./$(basename "${BASH_SOURCE[0]}") [OPTION] (COMMAND | NAME)
 
 Options:
-   -d | --debug LOW[,HIGH] Sets debug level to filter unncessary output messages
    -a | --add PATH         Creates new database entry for PATH, idenfied as NAME
    -t | --tag TAG[:TAG]    Add tag(s) to database entry for sorting or filtering
-
+   -d | --debug LOW[,HIGH] Sets debug level to filter unncessary output messages
+                           NOTE: Defaults LOW to 2 (WARN), levels <0 are garbage
 Commands:
    --column                In-place modifies database file to even width columns
-   --sort NUM              In-place sorts database file by the specified col NUM
-   --edit                  Opens \`conf\`s own confuration file for manual editing
+   --sort NUM[,NUM]        In-place sorts database file by the specified col NUM
+   --edit (db|conf)        Opens \`conf\`s own confuration file for manual editing
+                           NOTE: As this is a manual action, it does not trigger
+                           any auto_ features, such as auto_sort or auto_column.
 EOF
 
 exit $1
 }
 
+
+function write {
+   local lvl=$1 text="$2"
+
+   local debug_level=${__debug_level__:-$debug_level}
+   read low high __ <<< ${debug_level//,/ }
+   low=${low:-2} ; high=${high:-3}
+
+   [[ $lvl -lt $low  ]] && return 0
+   [[ $lvl -gt $high ]] && return 0
+
+   local lvlname color
+   case $lvl in
+     -2) color="${bk}"  ; lvlname='TRASH' ;;
+     -1) color="${bk}"  ; lvlname='NOISE' ;;
+      0) color="${cy}"  ; lvlname='DEBUG' ;;
+      1) color="${wh}"  ; lvlname='INFO'  ;;    # <- default user-visible from
+      2) color="${yl}"  ; lvlname='WARN'  ;;    #    here down
+      3) color="${brd}" ; lvlname='CRIT'  ;;
+
+      *) color="${wh}"  ; lvlname='INFO'  ;;
+   esac
+
+   printf "${color}[%-5s] %s${rst}\n"  "$lvlname"  "$text"
+}
+
+
+function get_editor {
+   [[ -n $editor ]] && echo "$editor"
+   [[ -n $EDITOR ]] && echo "$EDITOR"
+   [[ $(which vim 2>/dev/null) ]] && echo 'vim'
+   [[ $(which emacs 2>/dev/null) ]] && echo 'emacs'
+
+   write 3 "Editor is unset. Either export EDITOR, or specify in the config file"
+}
+
+
+function do_auto_column {
+   column -t "$DATABASE" > "$DATABASE"
+}
+
+
+function do_auto_sort {
+   local col=${1:-$auto_sort}
+
+   if [[ $auto_sort =~ ^[[:digit:]][,[:digit:]]$ ]] ; then
+      col=2
+   fi
+
+   sort -k "$col" "$DATABASE" > "$DATABASE"
+}
+
+
+function edit_internal {
+   local editor=$( get_editor )
+
+   case $1 in
+      d|db|data|database)
+            file="${DATABASE}"
+            ;;
+
+      c|conf|config)
+            file="${CONFFILE}"
+            ;;
+
+      *)    write 2 "Invalid param for --edit ($1). Defaulting to 'database'"
+            file="${DATABASE}" ;;
+   esac
+
+   exec "$editor $file"
+}
+
+
+function edit_file {
+   local name=$__name__
+   local path=$( awk "\$2 ~ /(^|,)($name)(\$|,)/ {print \$1}" )
+
+   if [[ -z $path ]] ; then
+      write 3 "No entry found matching '$name'"
+      exit 1
+   fi
+
+   exec "$editor $path"
+}
+
+
+#══════════════════════════════════╡ ENGAGE ╞═══════════════════════════════════
 #─────────────────────────────────( argparse )──────────────────────────────────
+__add__=false
+
 while [[ $# -gt 0 ]] ; do
    case $1 in
       -h|--help)
             usage 0 ;;
 
+      # Options:
       -d|--debug)
-            shift ; __debug_level__="$1" ; shift ;;
+            shift ; __debug_level__="$1"
+            shift ;;
 
       -a|--add)
-            shift ; __names__="$1" ; shift ;;
+            shift ; __path__="$1" ; __add__=true
+            shift ;;
 
       -t|--tag)
-            shift ; __tags__="$1" ; shift ;;
+            shift ; __tags__="$1"
+            shift ;;
 
-      -c|--column)
-            shift ; make_columns ;;
+      # Commands:
+      --column)
+            do_auto_column
+            exit 0 ;;
 
-      -s|--sort)
-            shift ; make_sorted ;;
+      --sort)
+            do_auto_sort ${1:-2}
+            exit 0 ;;
+
+      --edit)
+            edit_internal "$1" ;;
 
       *) __positional__+=( "$1" ) ; shift ;;
    esac
 done
 
-declare -a ERR_NUM_POSITIONAL
+# Validation
+declare -a ERRORS_ARGPARSE
+
 if [[ ${#__positional__[@]} -ne 1 ]] ; then
-   ERR_NUM_POSITIONAL=( "${__positional__[@]}" )
+   ERRORS_ARGPARSE+=( "Invalid positional arguments ${__positional__[@]}" )
 else
-   name="${__positional__[0]}"
+   __name__="${__positional__[0]}"
+fi
+
+#──────────────────────────────────( do shit )──────────────────────────────────
+editor=$( get_editor )
+
+if $__add__ ; then
+   echo "$__path__ $__name__" >> "${DATABASE}"
+   [[ $auto_column =~ ([Yy]es|[Tt]rue)  ]] && do_auto_column
+   [[ ! $auto_sort =~ (|[Nn]o|[Ff]alse) ]] && do_auto_sort
+else
+   edit_file
 fi
