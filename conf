@@ -30,7 +30,8 @@
 #══════════════════════════════════╡ GLOBAL ╞═══════════════════════════════════
 PROGDIR=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd )
 
-CONFDIR="${XDG_CONFIG_HOME:-$HOME/.config}/hre-utils/conf"
+#CONFDIR="${XDG_CONFIG_HOME:-$HOME/.config}/hre-utils/conf"
+CONFDIR="${PROGDIR}/tmp_data"
 mkdir -p "$CONFDIR"
 
 DATABASE="${CONFDIR}/database"
@@ -39,6 +40,7 @@ CONFFILE="${CONFDIR}/config"
 #──────────────────────────────────( source )───────────────────────────────────
 # TODO: use `import.sh`
 source $(which mk-colors.sh)
+source "${CONFFILE}"
 
 #═════════════════════════════════╡ FUNCTIONS ╞═════════════════════════════════
 #───────────────────────────────────( utils )───────────────────────────────────
@@ -48,12 +50,21 @@ USAGE: ./$(basename "${BASH_SOURCE[0]}") [OPTION] (COMMAND | NAME)
 
 Options:
    -a | --add PATH         Creates new database entry for PATH, idenfied as NAME
+
    -t | --tag TAG[:TAG]    Add tag(s) to database entry for sorting or filtering
+
    -d | --debug LOW[,HIGH] Sets debug level to filter unncessary output messages
                            NOTE: Defaults LOW to 2 (WARN), levels <0 are garbage
+
 Commands:
+   --ls                    Lists all entries in the database, columnizing output
+
+   --tls TAG               Search in database for entries matching specified TAG
+
    --column                In-place modifies database file to even width columns
+
    --sort NUM[,NUM]        In-place sorts database file by the specified col NUM
+
    --edit (db|conf)        Opens \`conf\`s own confuration file for manual editing
                            NOTE: As this is a manual action, it does not trigger
                            any auto_ features, such as auto_sort or auto_column.
@@ -85,39 +96,53 @@ function write {
       *) color="${wh}"  ; lvlname='INFO'  ;;
    esac
 
-   printf "${color}[%-5s] %s${rst}\n"  "$lvlname"  "$text"
+   #printf "${color}[%-5s] %s${rst}\n"  "$lvlname"  "$text"
+   echo "${color}[$lvlname] ${text}${rst}"
 }
 
 
 function get_editor {
-   [[ -n $editor ]] && echo "$editor"
-   [[ -n $EDITOR ]] && echo "$EDITOR"
-   [[ $(which vim 2>/dev/null) ]] && echo 'vim'
-   [[ $(which emacs 2>/dev/null) ]] && echo 'emacs'
-
-   write 3 "Editor is unset. Either export EDITOR, or specify in the config file"
+   if [[ -n $editor ]] ; then
+      echo "$editor"
+   elif [[ -n $EDITOR ]] ; then
+      echo "$EDITOR"
+   elif [[ $(which vim 2>/dev/null) ]] ; then
+      echo 'vim'
+   elif [[ $(which emacs 2>/dev/null) ]] ; then
+      echo 'emacs'
+   fi
 }
 
 
 function do_auto_column {
-   column -t "$DATABASE" > "$DATABASE"
+   local columned=$( column -t "$DATABASE" )
+   echo "$columned" > "$DATABASE"
 }
 
 
 function do_auto_sort {
    local col=${1:-$auto_sort}
 
-   if [[ $auto_sort =~ ^[[:digit:]][,[:digit:]]$ ]] ; then
+   if [[ ! $col =~ ^[[:digit:]](,[[:digit:]])?$ ]] ; then
+      write 2 "Invalid --sort param ($col)"
       col=2
    fi
 
-   sort -k "$col" "$DATABASE" > "$DATABASE"
+   local sorted=$( sort -k "$col" "$DATABASE" )
+   echo "$sorted" > "$DATABASE"
+}
+
+
+function list_by_tag {
+   local search="$1"
+
+   column -t < <(
+      awk "\$3 ~ /(^|:)($search)(\$|:)/ {print \$1 \" \" \$2}"  "${DATABASE}"
+   )
 }
 
 
 function edit_internal {
-   local editor=$( get_editor )
-
    case $1 in
       d|db|data|database)
             file="${DATABASE}"
@@ -131,26 +156,69 @@ function edit_internal {
             file="${DATABASE}" ;;
    esac
 
-   exec "$editor $file"
+   exec $editor $file
 }
 
 
 function edit_file {
    local name=$__name__
-   local path=$( awk "\$2 ~ /(^|,)($name)(\$|,)/ {print \$1}" )
+   local path=$(
+      awk "\$2 ~ /(^|,)($name)(\$|,)/ {print \$1}"  "${DATABASE}"
+   )
 
    if [[ -z $path ]] ; then
       write 3 "No entry found matching '$name'"
       exit 1
    fi
 
-   exec "$editor $path"
+   if [[ $(wc -l <<< "$path") -gt 1 ]] ; then
+      write 3 "Multiple files with the same NAME ($name) found"
+      exit 2
+   fi
+
+   exec $editor $path
 }
 
 
+function apply_tag {
+   local name=$__name__
+   local path=$(
+      awk "\$2 ~ /(^|,)($name)(\$|,)/ {print \$1}"  "${DATABASE}"
+   )
+
+   if [[ -z $path ]] ; then
+      write 3 "No entry found matching '$name'"
+      exit 1
+   fi
+
+   if [[ $(wc -l <<< "$path") -gt 1 ]] ; then
+      write 3 "Multiple files with the same NAME ($name) found"
+      exit 2
+   fi
+
+   awk "\$2 ~ /(^|,)($name)(\$|,)/ {print \$1}"  "${DATABASE}"
+}
+
+
+function add_entry {
+   echo "$__path__ $__name__" >> "${DATABASE}"
+   [[ $auto_column =~ ([Yy]es|[Tt]rue)  ]] && do_auto_column
+   [[ ! $auto_sort =~ (|[Nn]o|[Ff]alse) ]] && do_auto_sort
+}
+
 #══════════════════════════════════╡ ENGAGE ╞═══════════════════════════════════
+[[ $# -eq 0 ]] && usage 1
+
+editor=$( get_editor )
+if [[ -z $editor ]] ; then
+   write 3 "Editor is unset, specify in config file."
+   exit 1
+fi
+
 #─────────────────────────────────( argparse )──────────────────────────────────
+# Defaults
 __add__=false
+__tag__=false
 
 while [[ $# -gt 0 ]] ; do
    case $1 in
@@ -163,24 +231,39 @@ while [[ $# -gt 0 ]] ; do
             shift ;;
 
       -a|--add)
-            shift ; __path__="$1" ; __add__=true
+            __add__=true
+            shift ; __path__="$1"
             shift ;;
 
       -t|--tag)
+            __tag__=true
             shift ; __tags__="$1"
             shift ;;
 
       # Commands:
+      --edit)
+            shift ; edit_internal "$1" ;;
+
       --column)
             do_auto_column
             exit 0 ;;
 
       --sort)
+            shift
             do_auto_sort ${1:-2}
             exit 0 ;;
 
-      --edit)
-            edit_internal "$1" ;;
+      --ls)
+            cat "${DATABASE}"
+            exit 0 ;;
+
+      --lst)
+            shift
+            list_by_tag "$1"
+            exit 0 ;;
+
+      # Defaults:
+      -*) __invalid__+=( $1 ) ; shift ;;
 
       *) __positional__+=( "$1" ) ; shift ;;
    esac
@@ -190,18 +273,31 @@ done
 declare -a ERRORS_ARGPARSE
 
 if [[ ${#__positional__[@]} -ne 1 ]] ; then
-   ERRORS_ARGPARSE+=( "Invalid positional arguments ${__positional__[@]}" )
+   ERRORS_ARGPARSE+=( "NAME not specified" )
 else
    __name__="${__positional__[0]}"
 fi
 
-#──────────────────────────────────( do shit )──────────────────────────────────
-editor=$( get_editor )
+if [[ ${#__invalid__[@]} -gt 0 ]] ; then
+   ERRORS_ARGPARSE+=( "Invalid option(s): ${__invalid__[@]}" )
+fi
 
+if [[ ${#ERRORS_ARGPARSE[@]} -gt 0 ]] ; then
+   write 3 "Errors in argument parsing"
+
+   for idx in "${!ERRORS_ARGPARSE[@]}" ; do
+      err="${ERRORS_ARGPARSE[$idx]}"
+      echo "  $((idx+1)). $err"
+   done
+
+   exit 1
+fi
+
+#──────────────────────────────────( do shit )──────────────────────────────────
 if $__add__ ; then
-   echo "$__path__ $__name__" >> "${DATABASE}"
-   [[ $auto_column =~ ([Yy]es|[Tt]rue)  ]] && do_auto_column
-   [[ ! $auto_sort =~ (|[Nn]o|[Ff]alse) ]] && do_auto_sort
+   add_entry
+elif $__tag__ ; then
+   apply_tag
 else
    edit_file
 fi

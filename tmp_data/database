@@ -1,3 +1,2 @@
-/home/aurelius/.vimrc vimrc:vim:v
-/home/aurelius/.bashrc bashrc:bash:b
-/home/aurelius/.config/i3/config i3
+~/.bashrc  b,bash       terminal
+~/.vimrc   v,vim,vimrc  editor:terminal:term
