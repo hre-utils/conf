@@ -1,2 +1,2 @@
-~/.bashrc  b,bash       terminal
-~/.vimrc   v,vim,vimrc  editor:terminal:term
+~/.badshrc b,bash  term:terminal:
+~/.vimrc v,vimrc,bash term
