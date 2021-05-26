@@ -184,8 +184,8 @@ function apply_tag {
    local path existing_tags new_tags
 
    read -r path existing_tags <<< "$row"
-   new_tags=$( sort <<< "${1//,/$'\n'}")
-   new_tags="${new_tags//$'\n'/,}"
+   _new_tags=$( sort <<< "${__tags__//,/$'\n'}")
+   new_tags="${_new_tags//$'\n'/,}"
 
    local buffer=''
 }
@@ -198,8 +198,8 @@ function add_entry {
    fi
 
    if $__tag__ ; then
-      tags=$( sort <<< "${__tags__//,/$'\n'}")
-      tags="${new_tags//$'\n'/,}"
+      _tags=$( sort <<< "${__tags__//,/$'\n'}")
+      tags="${_tags//$'\n'/,}"
    fi
 
    echo "${__path__} ${__name__}${tags:+ }${tags}" >> "${DATABASE}"
@@ -256,7 +256,7 @@ function validate_database {
          write 2 "$warn_msg"
       done
    }
-      
+
    # Critical:
    [[ ${#duplicate_name[@]} -gt 0 ]] && {
       local _names=''

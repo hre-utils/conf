@@ -18,7 +18,6 @@ To adhere to the consistency of my other HRE utils, a ground-up rewrite was in o
 === What this is
 Small CLI utility to quickly open a specified config file in your editor of choice.
 Linux systems tend to spray config files across your entire filesystem, with little regard to standards.
-Or perhaps they all follow their own standard.
 https://xkcd.com/927/[This] comes to mind.
 The irony is not lost on me, as I create my own mini software suite filled with purely internal '`standards`'.
 
