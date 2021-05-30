@@ -17,17 +17,16 @@
 #══════════════════════════════════╡ GLOBAL ╞═══════════════════════════════════
 PROGDIR=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd )
 
-#CONFDIR="${XDG_CONFIG_HOME:-$HOME/.config}/hre-utils/conf"
-CONFDIR="${PROGDIR}/tmp_data"
-mkdir -p "$CONFDIR"
-
+CONFDIR="${XDG_CONFIG_HOME:-$HOME/.config}/hre-utils/conf"
 DATABASE="${CONFDIR}/database"
 CONFFILE="${CONFDIR}/config"
 
 #──────────────────────────────────( source )───────────────────────────────────
-# TODO: use `import.sh`
-source $(which mk-colors.sh)
+source $(which hre-lib-import.sh) || exit 1
 source "${CONFFILE}"
+# TODO: Do we want to use mkconf instead of importing the config file?
+
+.import colors
 
 #═════════════════════════════════╡ FUNCTIONS ╞═════════════════════════════════
 #───────────────────────────────────( utils )───────────────────────────────────
@@ -124,7 +123,7 @@ function list_by_tag {
 
 function edit_internal {
    case $1 in
-      d|db|data|database)
+      d|db|data|database|'')
             file="${DATABASE}"
             ;;
 
@@ -206,6 +205,31 @@ function add_entry {
 }
 
 
+function validate_argparse {
+   declare -ga ERRORS_ARGPARSE
+
+   if [[ ${#__positional__[@]} -ne 1 ]] ; then
+      ERRORS_ARGPARSE+=( "NAME not specified" )
+   else
+      __name__="${__positional__[0]}"
+   fi
+
+   if [[ ${#__invalid__[@]} -gt 0 ]] ; then
+      ERRORS_ARGPARSE+=( "Invalid option(s): ${__invalid__[@]}" )
+   fi
+
+   if [[ ${#ERRORS_ARGPARSE[@]} -gt 0 ]] ; then
+      write 3 "Errors in argument parsing"
+
+      for idx in "${!ERRORS_ARGPARSE[@]}" ; do
+         err="${ERRORS_ARGPARSE[$idx]}"
+         echo "  $((idx+1)). $err"
+      done
+
+      exit 1
+   fi
+}
+
 function validate_database {
    declare -A used_names
 
@@ -219,6 +243,9 @@ function validate_database {
    declare -a validation_critical
 
    while IFS=$'\n' read -r line ; do
+      # If the file is empty, nothing to validate:
+      [[ -z "$line" ]] && return 0
+
       read -r path names tags <<< "$line"
 
       #─────────────────────────────( paths )───────────────────────────────────
@@ -288,11 +315,11 @@ function validate_database {
       done
       exit 1
    }
+
+   return 0
 }
 
 #══════════════════════════════════╡ ENGAGE ╞═══════════════════════════════════
-validate_database ; exit 1
-
 [[ $# -eq 0 ]] && usage 1
 
 editor=$( get_editor )
@@ -328,7 +355,8 @@ while [[ $# -gt 0 ]] ; do
 
       # Commands:
       --edit)
-            shift ; edit_internal "$1" ;;
+            shift
+            edit_internal "$1" ;;
 
       --column)
             do_auto_column
@@ -348,6 +376,10 @@ while [[ $# -gt 0 ]] ; do
             list_by_tag "$1"
             exit 0 ;;
 
+      --validate)
+            validate_database
+            exit $? ;;
+
       # Defaults:
       -*) __invalid__+=( $1 ) ; shift ;;
 
@@ -355,31 +387,11 @@ while [[ $# -gt 0 ]] ; do
    esac
 done
 
-# Validation
-declare -a ERRORS_ARGPARSE
-
-if [[ ${#__positional__[@]} -ne 1 ]] ; then
-   ERRORS_ARGPARSE+=( "NAME not specified" )
-else
-   __name__="${__positional__[0]}"
-fi
-
-if [[ ${#__invalid__[@]} -gt 0 ]] ; then
-   ERRORS_ARGPARSE+=( "Invalid option(s): ${__invalid__[@]}" )
-fi
-
-if [[ ${#ERRORS_ARGPARSE[@]} -gt 0 ]] ; then
-   write 3 "Errors in argument parsing"
-
-   for idx in "${!ERRORS_ARGPARSE[@]}" ; do
-      err="${ERRORS_ARGPARSE[$idx]}"
-      echo "  $((idx+1)). $err"
-   done
-
-   exit 1
-fi
-
 #──────────────────────────────────( do shit )──────────────────────────────────
+validate_database
+validate_argparse
+
+# Options:
 if $__add__ ; then
    add_entry
 elif $__tag__ ; then
