@@ -11,8 +11,7 @@
 # arround with it.
 #
 #───────────────────────────────────( todo )────────────────────────────────────
-# 1. [ ] Make unique exits. This is a case for which ns-grep would be very
-#        useful.
+# 1. [ ] Use line numbers in the validation stage for more accurate logging
 #
 #══════════════════════════════════╡ GLOBAL ╞═══════════════════════════════════
 PROGDIR=$( cd "$(dirname "${BASH_SOURCE[0]}")" ; pwd )
@@ -264,8 +263,10 @@ function validate_database {
       done
 
       #─────────────────────────────( tags )────────────────────────────────────
-      if [[ ! "$tags" =~ ^[[:alnum:]_-]+(:[[:alnum:]_-]+)*$ ]] ; then
-         invalid_tag_format+=( "$tags" )
+      if [[ -n "$tags" ]] ; then
+         if [[ ! "$tags" =~ ^[[:alnum:]_-]+(:[[:alnum:]_-]+)*$ ]] ; then
+            invalid_tag_format+=( "$tags" )
+         fi
       fi
    done < "${DATABASE}"
 
