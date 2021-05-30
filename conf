@@ -40,7 +40,7 @@ Options:
                            NOTE: Defaults LOW to 2 (WARN), levels <0 are garbage
 Commands:
    --ls                  * Lists all entries in the database, columnizing output
-   --tls TAG             * Search in database for entries matching specified TAG
+   --lst TAG             * Search in database for entries matching specified TAG
    --column              * In-place modifies database file to even width columns
    --sort NUM[,NUM]      * In-place sorts database file by the specified col NUM
    --edit (db|conf)      * Opens \`conf\`s own confuration file for manual editing

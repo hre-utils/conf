@@ -9,4 +9,4 @@ DATABASE="${CONFDIR}/database"
 touch "$DATABASE"
 
 CONFFILE="${CONFDIR}/config"
-cp -vn "${PROGDIR}/doc/config" "${CONFFILE}"
+cp -vn "${PROGDIR}/doc/share/config" "${CONFFILE}"
