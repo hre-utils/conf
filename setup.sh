@@ -10,3 +10,5 @@ touch "$DATABASE"
 
 CONFFILE="${CONFDIR}/config"
 cp -vn "${PROGDIR}/doc/share/config" "${CONFFILE}"
+
+sudo ln -sv "${PROGDIR}/doc/share/_conf.sh" "/etc/bash_completion.d/"
