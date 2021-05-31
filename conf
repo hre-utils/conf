@@ -190,7 +190,7 @@ function apply_tag {
 
 
 function add_entry {
-   if [[ ! $__name__ =~ ^[[:alnum:]_-]+(,[[:alnum:]_-]+)* ]] ; then
+   if [[ ! $__name__ =~ ^[[:alnum:]\._-]+(,[[:alnum:]\._-]+)* ]] ; then
       write 3 "Invalid name format--required NAME[,NAME]*"
       exit 1
    fi
@@ -252,7 +252,7 @@ function validate_database {
       [[ ! -e "$path" ]] && path_not_exist+=( "$path" )
 
       #─────────────────────────────( names )───────────────────────────────────
-      if [[ ! "$names" =~ ^[[:alnum:]_-]+(,[[:alnum:]_-]+)*$ ]] ; then
+      if [[ ! "$names" =~ ^[[:alnum:]\._-]+(,[[:alnum:]\._-]+)*$ ]] ; then
          invalid_name_format+=( "$names" )
       fi
 
@@ -264,7 +264,7 @@ function validate_database {
 
       #─────────────────────────────( tags )────────────────────────────────────
       if [[ -n "$tags" ]] ; then
-         if [[ ! "$tags" =~ ^[[:alnum:]_-]+(:[[:alnum:]_-]+)*$ ]] ; then
+         if [[ ! "$tags" =~ ^[[:alnum:]\._-]+(:[[:alnum:]\._-]+)*$ ]] ; then
             invalid_tag_format+=( "$tags" )
          fi
       fi
