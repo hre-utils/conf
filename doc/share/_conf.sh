@@ -1,5 +1,7 @@
 #!/bin/bash
 # CLI completion for `conf`.
+# Docs:
+# https://www.gnu.org/software/bash/manual/html_node/Programmable-Completion-Builtins.html
 
 DATABASE="${XDG_CONFIG_HOME:-$HOME/.config}/hre-utils/conf/database"
 
@@ -41,7 +43,16 @@ function _CONF_COMP_MAIN {
    else
       case $prev in
          --add)
-               COMPREPLY=( $(compgen -f -- "$cur") )
+               for path in $(compgen -f -- "$cur") ; do
+                  if [[ -d "${path/\~/$HOME}" ]] ; then
+                     path+='/'
+                  fi
+                  COMPREPLY+=( "${path}" )
+               done
+               
+               if [[ ${#COMPREPLY[@]} -eq 1 && -d ${COMPREPLY[0]/\~/$HOME} ]] ; then
+                  compopt -o nospace
+               fi
                ;;
 
          --edit)
@@ -66,6 +77,5 @@ function _CONF_COMP_MAIN {
       esac
    fi
 }
-
 
 complete -F _CONF_COMP_MAIN conf
